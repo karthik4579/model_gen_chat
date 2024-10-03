@@ -4,3 +4,8 @@ __pycache__/
 *.pyc
 *.log
 env/
+config.env
+temp.txt
+data.json
+prompts.json
+test.py
