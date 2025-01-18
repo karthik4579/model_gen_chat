@@ -28,12 +28,13 @@ BASE_RESPONSE_FORMAT:
 Given the input make sure that you format into a valid JSON format before responding and 
 make sure to STRICTLY follow the strcuture below and abide to it, you are ONLY allowed to 
 respond in the given format and you have to STRICTLY abide to it and just return your response as a 
-JSON enclosed within custom starting and ending tags as <start_json> and <end_json> respectively 
-WITHOUT any further explaination or reasoning regarding the response. Also here the key in the json 
+JSON. WITHOUT any further explaination or reasoning regarding the response. Also here the key in the json 
 is the given prompt i.e in the place of prompt_something you have to put given prompt that means
 the value to the key of the prompt DO NOT put the key in there and the value has to be your generated 
 response to that prompt. Below there is  the format in which the input will be given which is defined 
-under INPUT_FORMAT and the format you have to respond to which is defined under OUTPUT_FORMAT.
+under INPUT_FORMAT and the format you have to respond to which is defined under OUTPUT_FORMAT. Also 
+remember you habe to strictly follow the OUTPUT_FORMAT and the response HAS TO BE in the format defined
+under OUTPUT_FORMAT DO NOT deviate from it and use some made up format.
 
 INPUT_FORMAT:
 {{
@@ -43,12 +44,10 @@ INPUT_FORMAT:
     "prompt_4" : some generated prompt 4
 }}
 
-OUTPUT_FORMAT:`
-<start_json>
+OUTPUT_FORMAT:
 {{
     "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2","prompt_3","prompt_4" etc. int the given input json : "your generated response"
 }}
-<end_json>
 
 CONDITIONS:
 CONDITION_1 = The dataset type is text_only.
@@ -68,13 +67,10 @@ IF $CONDITION_2:
     make sure you DO NOT make any mistakes and your reponse is still human like and natural and Also
     make sure to use the SEED_DATA to improve the response as it will allow you to reflect upon if you
     missed to learn something from the seed data. And here you don't need to use the BASE_RESPONSE_FORMAT
-    and use the format defined below where the response is a JSON enclosed within custom starting and 
-    ending tags as <start_json> and <end_json> respectively.
+    and use the format defined below where the response is a custom JSON.
     
-    <start_json>
     {{
         "prompt": This should contain the exact given prompt associated with the response given to you for reiteration.
         "improved_response": This should contain the improved response to the given prompt and make sure that the response does abide to the
         prompt and has some ground truth to it and is not just a random response.
     }}
-    <end_json>

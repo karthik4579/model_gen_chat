@@ -2,6 +2,7 @@ from utils import generate_chat_response
 import streamlit as st
 
 st.set_page_config(page_title="Ketu | LLM Finetuning Assistant", page_icon="🤖")
+#st.title("Ketu 🤖")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []

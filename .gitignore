@@ -9,3 +9,5 @@ temp.txt
 data.json
 prompts.json
 test.py
+test2.py
+generated_samples/
