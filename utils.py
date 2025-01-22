@@ -7,7 +7,6 @@ from groq import Groq
 from dotenv import dotenv_values
 import random
 import time
-import json_repair
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.auth import default
@@ -81,16 +80,18 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
         return parsed_search_metadata
     else:
         combined_json = {}
+        pattern = r"<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>"
         for i in range(10):
             try:
                 content = make_sequential_request(endpoint, headers, instance)
-                tag_removed_content = remove_thinking_tags(content['choices'][0]['message']['content'])
-                parsed_content = json_repair.loads(tag_removed_content)
-                json_data = json_repair.loads(parsed_content)
-                # Add prompts to combined_json
-                for key, value in json_data.items():
-                    new_key = f"prompt_{len(combined_json) + 1}"
-                    combined_json[new_key] = value
+                raw_content = content['choices'][0]['message']['content']
+                match = re.search(pattern, raw_content, re.DOTALL)
+                if match:
+                    json_data = json.loads(match.group(1))
+                    # Add prompts to combined_json
+                    for key, value in json_data.items():
+                        new_key = f"prompt_{len(combined_json) + 1}"
+                        combined_json[new_key] = value
             except Exception as e:
                 print(f"Error in batch {i}: {e}")
                 continue
@@ -215,6 +216,8 @@ def generate_data(dataset_type_val, dataset_goal):
 
     final_dataset = {}
     
+    pattern = r"<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>"
+    
     for prompt_num, (prompt_key, prompt_content) in enumerate(final_promptset.items(), 1):
         instance = {
             "model": "",
@@ -233,8 +236,12 @@ def generate_data(dataset_type_val, dataset_goal):
             content = response.json()
             full_content = content['choices'][0]['message']['content']
             try:
-                final_response = json_repair.loads(full_content)
-                final_dataset[f"prompt_{prompt_num}"] = final_response
+                match = re.search(pattern, full_content, re.DOTALL)
+                if match:
+                    final_response = json.loads(match.group(1))
+                    final_dataset[f"prompt_{prompt_num}"] = final_response
+                else:
+                    final_dataset[f"prompt_{prompt_num}"] = {"error": "No final answer found in response"}
             except:
                 final_dataset[f"prompt_{prompt_num}"] = {"error": "Invalid JSON in response"}
         except requests.exceptions.HTTPError as http_err:
