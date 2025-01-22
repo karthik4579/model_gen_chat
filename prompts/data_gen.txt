@@ -14,7 +14,8 @@ accordingly by noticing different variations like the style of writing, tone, fe
 the generation system when given the same seed data will be able to generate more of the similar kind of data but with a slight variations that make it sound different. 
 And try to be as correct as possible making sure you DO NOT make any mistakes in your response as your responses are crucial in creating a very good and unique dataset. 
 Try not to hallucinate and make sure to NOT make up any information and that your response is not contradicting the given seed data and has some ground truth to it that 
-you believe is correct according to your knowledge.
+you believe is correct according to your knowledge. Also a strong NOTE to consider during generation that use your chain of thought reasoning abilities to do the generation 
+using the given format.
 
 
 SYSTEM_VARIABLES:
@@ -34,7 +35,7 @@ the value to the key of the prompt DO NOT put the key in there and the value has
 response to that prompt. Below there is  the format in which the input will be given which is defined 
 under INPUT_FORMAT and the format you have to respond to which is defined under OUTPUT_FORMAT. Also 
 remember you habe to strictly follow the OUTPUT_FORMAT and the response HAS TO BE in the format defined
-under OUTPUT_FORMAT DO NOT deviate from it and use some made up format.
+under OUTPUT_FORMAT DO NOT deviate from it.
 
 INPUT_FORMAT:
 {{
@@ -45,9 +46,17 @@ INPUT_FORMAT:
 }}
 
 OUTPUT_FORMAT:
+<THINKING>
+here goes all of your though about all the edge cases and the pondering on your attempts
+to complete the planning/understanding  of the given generation task at
+</THINKING>
+<FINAL_ANSWER>
+use this tag to output the final answer when you are done with the planning/understanding
 {{
     "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2","prompt_3","prompt_4" etc. int the given input json : "your generated response"
 }}
+</FINAL_ANSWER>
+
 
 CONDITIONS:
 CONDITION_1 = The dataset type is text_only.
@@ -69,8 +78,15 @@ IF $CONDITION_2:
     missed to learn something from the seed data. And here you don't need to use the BASE_RESPONSE_FORMAT
     and use the format defined below where the response is a custom JSON.
     
+    <THINKING>
+    here goes all of your though about all the edge cases and the pondering on your attempts
+    to complete the planning/understanding  of the given generation task at
+    </THINKING>
+    <FINAL_ANSWER>
+    use this tag to output the final answer when you are done with the planning/understanding
     {{
         "prompt": This should contain the exact given prompt associated with the response given to you for reiteration.
         "improved_response": This should contain the improved response to the given prompt and make sure that the response does abide to the
         prompt and has some ground truth to it and is not just a random response.
     }}
+    </FINAL_ANSWER>

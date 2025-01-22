@@ -1,7 +1,6 @@
-import concurrent.futures
+import re
 import requests
 import json
-import re
 from pathlib import Path
 from langchain_core.prompts import PromptTemplate
 from groq import Groq
@@ -15,10 +14,7 @@ from google.auth import default
 import uuid
 import pandas as pd
 import os
-import zipfile
-from supabase import create_client, Client
-import sseclient
-import threading  # Import threading module
+import threading
 
 global final_promptset
 
@@ -35,7 +31,6 @@ with open(f"{Path.cwd()}/prompts/data_gen.txt") as datagen_prompt:
 promptgen_system_prompt = PromptTemplate.from_template(raw_promptgen_system_prompt)
 datagen_system_prompt = PromptTemplate.from_template(raw_datagen_system_prompt)
 
-import threading
 
 # Single lock for synchronizing requests
 request_lock = threading.Lock()
@@ -44,7 +39,7 @@ def make_sequential_request(endpoint, headers, instance, retry_count=3):
     with request_lock:
         for attempt in range(retry_count):
             try:
-                response = requests.post(endpoint, headers=headers, json=instance, verify=False, timeout=30)
+                response = requests.post(endpoint, headers=headers, json=instance, verify=False, timeout=3000)
                 response.raise_for_status()
                 time.sleep(2)  # Wait before next request
                 return response.json()
@@ -62,7 +57,7 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
         dataset_type=dataset_type_val
     )
     
-    endpoint = "https://ketu-llm-api.loca.lt/v1/chat/completions"
+    endpoint = "http://127.0.0.1:8080/v1/chat/completions"
     headers = {
             "Content-Type": "application/json"
         }
@@ -80,13 +75,18 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
     }
 
     if seed_data_val == "":
-        return make_sequential_request(endpoint, headers, instance)
+        search_metadata = make_sequential_request(endpoint, headers, instance)
+        tag_removed_search_metadata = remove_thinking_tags(search_metadata['choices'][0]['message']['content'])
+        parsed_search_metadata = json_repair.loads(tag_removed_search_metadata)
+        return parsed_search_metadata
     else:
         combined_json = {}
         for i in range(10):
             try:
                 content = make_sequential_request(endpoint, headers, instance)
-                json_data = json_repair.loads(content['choices'][0]['message']['content'])
+                tag_removed_content = remove_thinking_tags(content['choices'][0]['message']['content'])
+                parsed_content = json_repair.loads(tag_removed_content)
+                json_data = json_repair.loads(parsed_content)
                 # Add prompts to combined_json
                 for key, value in json_data.items():
                     new_key = f"prompt_{len(combined_json) + 1}"
@@ -116,35 +116,42 @@ def generate_promptset(dataset_goal, dataset_type):
     )
     return promptset
 
+def remove_thinking_tags(text):
+    pattern = r'\s*<think>.*?</think>\s*'
+    cleaned_text = re.sub(pattern, ' ', text, flags=re.DOTALL)
+    # Clean up multiple spaces
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+    return cleaned_text.strip()
 
 def get_seed_data(search_metadata):
     offset = random.randint(0, 1000)
     length = 5
     headers = {"Authorization": f"Bearer {api_keys['HF_API_KEY']}"}
-    print(search_metadata)
+   
     if search_metadata['dataset_type'] == 'web_data':
         fineweb_url = f"https://datasets-server.huggingface.co/search?dataset=HuggingFaceFW%2Ffineweb&config=default&split=train&query={requests.utils.quote(search_metadata['search_term'])}&offset={offset}&length={length}"
-        response = requests.get(fineweb_url, headers=headers)
+        response = requests.get(fineweb_url, headers=headers,timeout=120)
         print(response.json())
         return response.json()['rows']
-    if search_metadata['dataset_type'] == 'educational_web_data':
+    elif search_metadata['dataset_type'] == 'educational_web_data':
         fineweb_edu_url = f"https://datasets-server.huggingface.co/rows?dataset=HuggingFaceFW%2Ffineweb-edu&config=default&split=train&query={requests.utils.quote(search_metadata['search_term'])}&offset={offset}&length={length}"
-        response = requests.get(fineweb_edu_url, headers=headers)
+        response = requests.get(fineweb_edu_url, headers=headers,timeout=120)
         return response.json()['rows']
     
-    if search_metadata['dataset_type'] == 'code_data':
+    elif search_metadata['dataset_type'] == 'code_data':
         code_feedback_url = f"https://datasets-server.huggingface.co/rows?dataset=m-a-p%2FCodeFeedback-Filtered-Instruction&config=default&split=train&query={requests.utils.quote(search_metadata['search_term'])}&offset={offset}&length={length}"
-        response = requests.get(code_feedback_url, headers=headers)
+        response = requests.get(code_feedback_url, headers=headers,timeout=120)
         return response.json()['rows']
     
-    if search_metadata['dataset_type'] == 'creative_writing_data':
+    elif search_metadata['dataset_type'] == 'creative_writing_data':
         creative_writing_url = f"https://datasets-server.huggingface.co/rows?dataset=Lambent%2F1k-creative-writing-8kt-fineweb-edu-sample&config=default&query={requests.utils.quote(search_metadata['search_term'])}&split=train&offset={offset}&length={length}"
-        response = requests.get(creative_writing_url, headers=headers)
+        response = requests.get(creative_writing_url, headers=headers,timeout=120)
         return response.json()['rows']
     
-    if search_metadata['dataset_type'] == 'diffusiondb_data':
+    elif search_metadata['dataset_type'] == 'diffusiondb_data':
         pass
-
+    else:
+        pass
 
 def generate_chat_response(chat_history):
     message_list = [
@@ -157,8 +164,8 @@ def generate_chat_response(chat_history):
     completion = client.chat.completions.create(
         model="llama-3.1-70b-versatile",
         messages=message_list,
-        temperature=0.6,
-        max_tokens=5000,
+        temperature=0.5,
+        max_tokens=4000,
         top_p=1,
         stream=False,
         response_format={"type": "json_object"},
@@ -174,7 +181,7 @@ def generate_chat_response(chat_history):
         thread = threading.Thread(target=generate_data, args=(dataset_type, dataset_goal))
         thread.start()
         
-        return "Dataset generation has started and is running in the background. You will be notified once it's complete."
+        return "The model creation has started and is running in the background. You will be notified once it's complete."
     else:
         return response_content.get('current_message', "No message available.")
 
@@ -201,7 +208,7 @@ def generate_data(dataset_type_val, dataset_goal):
     )
     
     # Use the self-hosted endpoint
-    endpoint = "https://ketu-llm-api.loca.lt/v1/chat/completions"
+    endpoint = "http://127.0.0.1:8080/v1/chat/completions"
     headers = {
         "Content-Type": "application/json"
     }
@@ -215,13 +222,13 @@ def generate_data(dataset_type_val, dataset_goal):
                 {"role": "system", "content": final_datagen_system_prompt},
                 {"role": "user", "content": prompt_content}
             ],
-            "temperature": 0.7,
+            "temperature": 0.6,
             "max_tokens": 32000,
             "stream": False
         }
         
         try:
-            response = requests.post(endpoint, headers=headers, json=instance, verify=False)
+            response = requests.post(endpoint, headers=headers, json=instance, verify=False,timeout=3000)
             response.raise_for_status()
             content = response.json()
             full_content = content['choices'][0]['message']['content']
@@ -249,16 +256,6 @@ def generate_data(dataset_type_val, dataset_goal):
         print(f"Error writing to file: {e}")
 
     return final_dataset
-
-
-def get_refreshed_access_token():
-    credentials, project = default()
-    
-    if not credentials.valid:
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-    
-    return credentials.token
 
 
 def create_directory(uuid_name):
