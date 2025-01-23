@@ -14,6 +14,7 @@ import uuid
 import pandas as pd
 import os
 import threading
+from json_repair import loads as json_repair_loads  # Add at the top with other imports
 
 global final_promptset
 
@@ -40,14 +41,12 @@ def make_sequential_request(endpoint, headers, instance, retry_count=3):
             try:
                 response = requests.post(endpoint, headers=headers, json=instance, verify=False, timeout=3000)
                 response.raise_for_status()
-                time.sleep(2)  # Wait before next request
                 return response.json()
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {e}")
                 if attempt < retry_count - 1:
-                    time.sleep(2)
-                else:
-                    raise
+                    continue
+                raise
 
 def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should_search_val="true"):
     final_promptgen_system_prompt = promptgen_system_prompt.format(
@@ -74,27 +73,52 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
     }
 
     if seed_data_val == "":
-        search_metadata = make_sequential_request(endpoint, headers, instance)
-        tag_removed_search_metadata = remove_thinking_tags(search_metadata['choices'][0]['message']['content'])
-        parsed_search_metadata = json_repair.loads(tag_removed_search_metadata)
-        return parsed_search_metadata
+        try:
+            search_metadata = make_sequential_request(endpoint, headers, instance)
+            if isinstance(search_metadata, dict) and 'choices' in search_metadata:
+                content = search_metadata['choices'][0]['message']['content']
+                tag_removed_search_metadata = remove_thinking_tags(content)
+                try:
+                    return json.loads(tag_removed_search_metadata)
+                except json.JSONDecodeError:
+                    return json_repair_loads(tag_removed_search_metadata)
+            raise ValueError("Invalid response format")
+        except Exception as e:
+            print(f"Error in search metadata generation: {e}")
+            raise
     else:
         combined_json = {}
         pattern = r"<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>"
+        
         for i in range(10):
             try:
-                content = make_sequential_request(endpoint, headers, instance)
-                raw_content = content['choices'][0]['message']['content']
-                match = re.search(pattern, raw_content, re.DOTALL)
+                response = make_sequential_request(endpoint, headers, instance)
+                if not isinstance(response, dict) or 'choices' not in response:
+                    print(f"Invalid response format in batch {i}")
+                    continue
+                
+                content = response['choices'][0]['message']['content']
+                match = re.search(pattern, content, re.DOTALL)
+                
                 if match:
-                    json_data = json.loads(match.group(1))
-                    # Add prompts to combined_json
-                    for key, value in json_data.items():
-                        new_key = f"prompt_{len(combined_json) + 1}"
-                        combined_json[new_key] = value
+                    try:
+                        json_data = json.loads(match.group(1))
+                        for key, value in json_data.items():
+                            new_key = f"prompt_{len(combined_json) + 1}"
+                            combined_json[new_key] = value
+                    except json.JSONDecodeError:
+                        # Try with json_repair if standard json.loads fails
+                        try:
+                            json_data = json_repair_loads(match.group(1))
+                            for key, value in json_data.items():
+                                new_key = f"prompt_{len(combined_json) + 1}"
+                                combined_json[new_key] = value
+                        except Exception as e:
+                            print(f"JSON repair failed in batch {i}: {e}")
             except Exception as e:
                 print(f"Error in batch {i}: {e}")
                 continue
+            
         return combined_json
 
 
