@@ -27,19 +27,12 @@ make sure to STRICTLY follow the strcuture below and abide to it, you are ONLY a
 respond in the given format and you have to STRICTLY abide to it and just return your 
 response as a valid JSON.
 
-<THINKING>
-here goes all of your though about all the edge cases and the pondering on your attempts
-to complete the planning/understanding  of the given generation task at
-</THINKING>
-<FINAL_ANSWER>
-use this tag to output the final answer when you are done with the planning/understanding
 {{
     "prompt_1" : some generated prompt 1
     "prompt_2" : some generated prompt 2
     "prompt_3" : some generated prompt 3
     "prompt_4" : some generated prompt 4
 }}
-</FINAL_ANSWER>
 
 CONDITIONS:
 CONDITION_1 = The situation is such that the SEARCH variable is set to 'true' and SEED_DATA is empty.
@@ -57,17 +50,12 @@ IF $CONDITION_1:
     SEED_DATA searching is the first step after which on the next turn SEED_DATA will be populated with related prompts in the seed dataset so that you can have as much seed 
     prompts as context as possible. As for the type of seed datasets available to you most of them are self explanatory but for diffusiondb_data it is a dataset that includes 
     a set of sample images and their prompts although you can ONLY search for the prompts to be used as seed.  
-    <THINKING>
-    here goes all of your though about all the edge cases and the pondering on your attempts
-    to complete the planning/understanding  of the given generation task at
-    </THINKING>
-    <FINAL_ANSWER>
-    use this tag to output the final answer when you are done with the planning/understanding
+    
     {{
         "search_term": search term as a text string
         "dataset_type": The type of the dataset you want to search from.
     }}
-    </FINAL_ANSWER>
+
 ELSE:
     If it is set to False in such a case check if the SEED_DATA are populated if not then return a response
     in the same format as returned in the IF section of this same condition and then DO NOT continue forward with

@@ -1,4 +1,4 @@
-import re
+import os
 import requests
 import json
 from pathlib import Path
@@ -12,9 +12,7 @@ from google.oauth2.credentials import Credentials
 from google.auth import default
 import uuid
 import pandas as pd
-import os
 import threading
-from json_repair import loads as json_repair_loads  # Add at the top with other imports
 
 global final_promptset
 
@@ -30,7 +28,6 @@ with open(f"{Path.cwd()}/prompts/data_gen.txt") as datagen_prompt:
 
 promptgen_system_prompt = PromptTemplate.from_template(raw_promptgen_system_prompt)
 datagen_system_prompt = PromptTemplate.from_template(raw_datagen_system_prompt)
-
 
 # Single lock for synchronizing requests
 request_lock = threading.Lock()
@@ -77,18 +74,13 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
             search_metadata = make_sequential_request(endpoint, headers, instance)
             if isinstance(search_metadata, dict) and 'choices' in search_metadata:
                 content = search_metadata['choices'][0]['message']['content']
-                tag_removed_search_metadata = remove_thinking_tags(content)
-                try:
-                    return json.loads(tag_removed_search_metadata)
-                except json.JSONDecodeError:
-                    return json_repair_loads(tag_removed_search_metadata)
+                return json.loads(content)
             raise ValueError("Invalid response format")
         except Exception as e:
             print(f"Error in search metadata generation: {e}")
             raise
     else:
         combined_json = {}
-        pattern = r"<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>"
         
         for i in range(10):
             try:
@@ -98,29 +90,15 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
                     continue
                 
                 content = response['choices'][0]['message']['content']
-                match = re.search(pattern, content, re.DOTALL)
-                
-                if match:
-                    try:
-                        json_data = json.loads(match.group(1))
-                        for key, value in json_data.items():
-                            new_key = f"prompt_{len(combined_json) + 1}"
-                            combined_json[new_key] = value
-                    except json.JSONDecodeError:
-                        # Try with json_repair if standard json.loads fails
-                        try:
-                            json_data = json_repair_loads(match.group(1))
-                            for key, value in json_data.items():
-                                new_key = f"prompt_{len(combined_json) + 1}"
-                                combined_json[new_key] = value
-                        except Exception as e:
-                            print(f"JSON repair failed in batch {i}: {e}")
+                json_data = json.loads(content)
+                for key, value in json_data.items():
+                    new_key = f"prompt_{len(combined_json) + 1}"
+                    combined_json[new_key] = value
             except Exception as e:
                 print(f"Error in batch {i}: {e}")
                 continue
             
         return combined_json
-
 
 def generate_promptset(dataset_goal, dataset_type):
     search_metadata = generate_prompts(
@@ -140,13 +118,6 @@ def generate_promptset(dataset_goal, dataset_type):
         should_search_val="false"
     )
     return promptset
-
-def remove_thinking_tags(text):
-    pattern = r'\s*<think>.*?</think>\s*'
-    cleaned_text = re.sub(pattern, ' ', text, flags=re.DOTALL)
-    # Clean up multiple spaces
-    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
-    return cleaned_text.strip()
 
 def get_seed_data(search_metadata):
     offset = random.randint(0, 1000)
@@ -210,7 +181,6 @@ def generate_chat_response(chat_history):
     else:
         return response_content.get('current_message', "No message available.")
 
-
 def generate_data(dataset_type_val, dataset_goal):
     final_promptset = generate_promptset(
         dataset_goal=dataset_goal,
@@ -240,8 +210,6 @@ def generate_data(dataset_type_val, dataset_goal):
 
     final_dataset = {}
     
-    pattern = r"<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>"
-    
     for prompt_num, (prompt_key, prompt_content) in enumerate(final_promptset.items(), 1):
         instance = {
             "model": "",
@@ -259,15 +227,8 @@ def generate_data(dataset_type_val, dataset_goal):
             response.raise_for_status()
             content = response.json()
             full_content = content['choices'][0]['message']['content']
-            try:
-                match = re.search(pattern, full_content, re.DOTALL)
-                if match:
-                    final_response = json.loads(match.group(1))
-                    final_dataset[f"prompt_{prompt_num}"] = final_response
-                else:
-                    final_dataset[f"prompt_{prompt_num}"] = {"error": "No final answer found in response"}
-            except:
-                final_dataset[f"prompt_{prompt_num}"] = {"error": "Invalid JSON in response"}
+            final_response = json.loads(full_content)
+            final_dataset[f"prompt_{prompt_num}"] = final_response
         except requests.exceptions.HTTPError as http_err:
             print(f"HTTP error for prompt_{prompt_num}: {http_err}")
             final_dataset[f"prompt_{prompt_num}"] = {"error": f"HTTP error: {http_err}"}
@@ -276,6 +237,9 @@ def generate_data(dataset_type_val, dataset_goal):
             final_dataset[f"prompt_{prompt_num}"] = {"error": f"An error occurred: {err}"}
         
         time.sleep(1)
+    
+    # Ensure the generated_datasets directory exists
+    os.makedirs(f"{Path.cwd()}/generated_datasets", exist_ok=True)
     
     # Write the final_dataset to dataset.json
     dataset_path = f"{Path.cwd()}/generated_datasets/dataset.json"
@@ -288,11 +252,9 @@ def generate_data(dataset_type_val, dataset_goal):
 
     return final_dataset
 
-
 def create_directory(uuid_name):
     os.makedirs(uuid_name, exist_ok=True)
     return uuid_name
-
 
 def save_as_json(data, directory, filename):
     with open(os.path.join(directory, f"{filename}.json"), 'w') as f:

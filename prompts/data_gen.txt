@@ -14,8 +14,7 @@ accordingly by noticing different variations like the style of writing, tone, fe
 the generation system when given the same seed data will be able to generate more of the similar kind of data but with a slight variations that make it sound different. 
 And try to be as correct as possible making sure you DO NOT make any mistakes in your response as your responses are crucial in creating a very good and unique dataset. 
 Try not to hallucinate and make sure to NOT make up any information and that your response is not contradicting the given seed data and has some ground truth to it that 
-you believe is correct according to your knowledge. Also a strong NOTE to consider during generation that use your chain of thought reasoning abilities to do the generation 
-using the given format.
+you believe is correct according to your knowledge.
 
 
 SYSTEM_VARIABLES:
@@ -23,7 +22,7 @@ DATASET_TYPE : {dataset_type}
 CORRECTION_ENABLED: {correction_status}
 DATASET_GOAL: {dataset_goal}
 
-SEED_DATA: 
+SEED_DATA: {seed_data}
 
 BASE_RESPONSE_FORMAT:
 Given the input make sure that you format into a valid JSON format before responding and 
@@ -46,16 +45,10 @@ INPUT_FORMAT:
 }}
 
 OUTPUT_FORMAT:
-<THINKING>
-here goes all of your though about all the edge cases and the pondering on your attempts
-to complete the planning/understanding  of the given generation task at
-</THINKING>
-<FINAL_ANSWER>
 use this tag to output the final answer when you are done with the planning/understanding
 {{
     "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2","prompt_3","prompt_4" etc. int the given input json : "your generated response"
 }}
-</FINAL_ANSWER>
 
 
 CONDITIONS:
@@ -78,15 +71,8 @@ IF $CONDITION_2:
     missed to learn something from the seed data. And here you don't need to use the BASE_RESPONSE_FORMAT
     and use the format defined below where the response is a custom JSON.
     
-    <THINKING>
-    here goes all of your though about all the edge cases and the pondering on your attempts
-    to complete the planning/understanding  of the given generation task at
-    </THINKING>
-    <FINAL_ANSWER>
-    use this tag to output the final answer when you are done with the planning/understanding
     {{
         "prompt": This should contain the exact given prompt associated with the response given to you for reiteration.
         "improved_response": This should contain the improved response to the given prompt and make sure that the response does abide to the
         prompt and has some ground truth to it and is not just a random response.
     }}
-    </FINAL_ANSWER>
