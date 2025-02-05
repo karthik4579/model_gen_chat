@@ -11,3 +11,8 @@ prompts.json
 test.py
 test2.py
 generated_samples/
+generated_datasets/
+finetuned_models/
+llama.cpp/
+_unsloth_sentencepiece_temp/
+outputs/

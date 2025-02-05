@@ -6,13 +6,14 @@ text-to-text transformers based llms and text-to-image diffusion models that gen
 create response of prompts which will be a synthetic dataset of EXACTLY 100 very unique prompts an make sure that each prompt a little bit different with different 
 scenarios which is upto you to imagine. Below sections consist of a conditionally written like the python programming language 
 now what you have to do is understand the conditions defined under the CONDITIONS section and there are variables defined as well under the SYSTEM_VARIABLES 
-section use them to follow the instructions under the MAIN section that comprises of IF ELSE blocks just like in the python programming language and the 
+section use them to follow the instructions STRICTLY under the MAIN section that comprises of IF ELSE blocks just like in the python programming language and the 
 conditions will be called by using the '$' symbol and will have have a section containing the instructions and if a condition is met what you have to do is 
 return a response using in the format defined under the BASE_RESPONSE_FORMAT section STRICTLY. And some seed data from a curated dataset thats is related  
 to the user's goal which will be provided to you under the SEED_DATA section it is expected that you use these prompts to retrieve and augument your response 
 accordingly by noticing different variations like the style of writing, tone, feel and so on in the the given seed data and modelling your prompts accordingly so that 
-the generation system when given the same seed data will be able to generate more of the similar kind of data but with a slight variations that make it sound different.
-
+the generation system when given the same seed data will be able to generate more of the similar kind of data but with a slight variations that make it sound different but
+keeping in mind the given dataset end goal like writing a blog,prose etc. Also return the specified JSON format only when the particular conditions are met and DO NOT accidently 
+mash up the specified outputs BASE_RESPONSE_FORMAT and CONDITION_1. Also be as descriptive and diverse as possible in your prompts given text or the image modality consider this PRIORITY too.
 
 SYSTEM_VARIABLES:
 SEARCH : {should_search}
@@ -22,9 +23,9 @@ SEED_DATA:
 {seed_data}
 
 BASE_RESPONSE_FORMAT:
-Given the input make sure that you format into a valid JSON format before responding and 
+Given an input make sure that you format into a valid JSON format before responding and 
 make sure to STRICTLY follow the strcuture below and abide to it, you are ONLY allowed to 
-respond in the given format and you have to STRICTLY abide to it and just return your 
+respond in the format given below and you have to STRICTLY abide to it and just return your 
 response as a valid JSON.
 
 {{
@@ -49,16 +50,16 @@ IF $CONDITION_1:
     highly likely that the search term will be present. And also note that without the SEED_DATA being present you are not allowed to generate anything as initially if nothing is given under 
     SEED_DATA searching is the first step after which on the next turn SEED_DATA will be populated with related prompts in the seed dataset so that you can have as much seed 
     prompts as context as possible. As for the type of seed datasets available to you most of them are self explanatory but for diffusiondb_data it is a dataset that includes 
-    a set of sample images and their prompts although you can ONLY search for the prompts to be used as seed.  
+    a set of sample images and their prompts although you can ONLY search for the prompts to be used as seed. The given JSON format below has to be 
     
     {{
-        "search_term": search term as a text string
-        "dataset_type": The type of the dataset you want to search from.
+        "search_term": search term as text
+        "dataset_type": The type of the dataset you want to search -> web_data|educational_web_data|code_data|creative_writing_data.
     }}
 
 ELSE:
-    If it is set to False in such a case check if the SEED_DATA are populated if not then return a response
-    in the same format as returned in the IF section of this same condition and then DO NOT continue forward with
+    If it is set to False in such a case check if the SEED_DATA is populated if not then return a response
+    in the same format as returned in the IF section and then DO NOT continue forward with
     generating the prompts by assuming that they are populated instead just tell that you will start generation once 
     the SEED_DATA are populated.
 

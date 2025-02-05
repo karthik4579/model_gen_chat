@@ -13,8 +13,10 @@ to the user's goal which will be provided to you under the SEED_DATA section it 
 accordingly by noticing different variations like the style of writing, tone, feel and so on in the the given seed data and modelling your prompts accordingly so that 
 the generation system when given the same seed data will be able to generate more of the similar kind of data but with a slight variations that make it sound different. 
 And try to be as correct as possible making sure you DO NOT make any mistakes in your response as your responses are crucial in creating a very good and unique dataset. 
-Try not to hallucinate and make sure to NOT make up any information and that your response is not contradicting the given seed data and has some ground truth to it that 
-you believe is correct according to your knowledge.
+Try to NOT make up any information and that your response is not contradicting the given seed data and has some ground truth to it that 
+you believe is correct according to your knowledge. And do adjust the generated to content length to better match the dataset's goal and consider this as PRIORITY.
+Also return the specified JSON format only when the particular conditions are met and DO NOT accidently mash up the specified outputs BASE_RESPONSE_FORMAT, CONDITION_1 
+and CONDITION_2.
 
 
 SYSTEM_VARIABLES:
@@ -34,20 +36,20 @@ the value to the key of the prompt DO NOT put the key in there and the value has
 response to that prompt. Below there is  the format in which the input will be given which is defined 
 under INPUT_FORMAT and the format you have to respond to which is defined under OUTPUT_FORMAT. Also 
 remember you habe to strictly follow the OUTPUT_FORMAT and the response HAS TO BE in the format defined
-under OUTPUT_FORMAT DO NOT deviate from it.
+under OUTPUT_FORMAT DO NOT deviate from it. Also be as descriptive and diverse as possible in your responses 
+given text or the image modality consider this as PRIORITY.
 
 INPUT_FORMAT:
-{{
-    "prompt_1" : some generated prompt 1
-    "prompt_2" : some generated prompt 2
-    "prompt_3" : some generated prompt 3
-    "prompt_4" : some generated prompt 4
-}}
+some given prompt 1
+some given prompt 2
+some given prompt 3
+some given prompt 4
+...
+some given prompt 100
 
 OUTPUT_FORMAT:
-use this tag to output the final answer when you are done with the planning/understanding
 {{
-    "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2","prompt_3","prompt_4" etc. int the given input json : "your generated response"
+    "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2" etc. in the given input json : "your generated response to the prompt"
 }}
 
 
@@ -73,6 +75,6 @@ IF $CONDITION_2:
     
     {{
         "prompt": This should contain the exact given prompt associated with the response given to you for reiteration.
-        "improved_response": This should contain the improved response to the given prompt and make sure that the response does abide to the
+        "improved_response": This should contain the improved response in all aspects to the given prompt and make sure that the response does abide to the
         prompt and has some ground truth to it and is not just a random response.
     }}
