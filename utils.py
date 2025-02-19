@@ -13,11 +13,17 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 import uuid
 import threading
+#from fine_tuning_utils import finetune_model
+from sentence_transformers import SentenceTransformer
+from torchmetrics.text.bert import BERTScore
+from typing import Any
 
-model = SentenceTransformer('NovaSearch/stella_en_400M_v5',trust_remote_code=True)
+embedding_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2", device="cpu")
 
-api_keys = dotenv_values(f"{Path.cwd()}/config.env")
-client = Groq(api_key=api_keys["GROQ_API_KEY"])
+config_values = dotenv_values(f"{Path.cwd()}/config.env")
+api_url = config_values['AI_API_URL']
+client = Groq(api_key=config_values["AI_API_KEY"])
+chat_client = Groq(api_key=config_values["AI_API_KEY_CHAT"])
 
 with open(f"{Path.cwd()}/prompts/prompt_gen.txt") as promptgen_prompt:
     raw_promptgen_system_prompt = promptgen_prompt.read()
@@ -25,18 +31,20 @@ with open(f"{Path.cwd()}/prompts/chat_gen.txt") as chatgen_prompt:
     chatgen_system_prompt = chatgen_prompt.read()
 with open(f"{Path.cwd()}/prompts/data_gen.txt") as datagen_prompt:
     raw_datagen_system_prompt = datagen_prompt.read()
+with open(f"{Path.cwd()}/prompts/rewrite_gen.txt") as rewritegen_prompt:
+    raw_rewrite_system_prompt = rewritegen_prompt.read()
 
 promptgen_system_prompt = PromptTemplate.from_template(raw_promptgen_system_prompt)
 datagen_system_prompt = PromptTemplate.from_template(raw_datagen_system_prompt)
+rewritegen_system_prompt = PromptTemplate.from_template(raw_rewrite_system_prompt)
 
 request_lock = threading.Lock()
 
-def make_sequential_request(endpoint, headers, instance, retry_count=5):
+def make_sequential_request(endpoint, headers, instance, retry_count=8) -> Any:
     with request_lock:
         for attempt in range(retry_count):
             try:
                 response = requests.post(endpoint, headers=headers, json=instance, timeout=3000)
-                response.raise_for_status()
                 return response.json()
             except Exception as e:
                 print(f"Attempt {attempt + 1} failed: {e}")
@@ -51,23 +59,21 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
         dataset_type=dataset_type_val
     )
 
-    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    endpoint = f"{api_url}/v1/chat/completions"
 
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_keys['GROQ_API_KEY']}"
+        "Authorization": f"Bearer {config_values['AI_API_KEY']}"
     }
 
     instance = {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama-3.3-70b",
         "messages": [
             {"role": "system", "content": final_promptgen_system_prompt},
             {"role": "user", "content": dataset_goal}
         ],
-        "temperature": 0.5,
         "stream": False,
-        "max_tokens": 32000, 
-        "stop": None
+        "max_tokens": 8192
     }
 
     if seed_data_val == "":
@@ -75,6 +81,7 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
             search_metadata = make_sequential_request(endpoint, headers, instance)
             if isinstance(search_metadata, dict) and 'choices' in search_metadata:
                 content = search_metadata['choices'][0]['message']['content']
+                print()
                 return json_repair.loads(content)
             raise ValueError("Invalid response format")
         except Exception as e:
@@ -84,9 +91,10 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
         combined_json = {}
         prompt_counter = 1  # Track total prompts across batches
 
-        for i in range(5):
+        for i in range(1,5):
             try:
                 response = make_sequential_request(endpoint, headers, instance)
+                print(response)
                 if not isinstance(response, dict) or 'choices' not in response:
                     print(f"Invalid response format in batch {i}")
                     continue
@@ -109,7 +117,7 @@ def generate_prompts(dataset_goal, seed_data_val="", dataset_type_val="", should
                         prompt_counter += 1
                 print(json_data)
                 print(f"Added {len(json_data)} prompts from batch {i}")
-                
+                time.sleep(3)
             except Exception as e:
                 print(f"Error in batch {i}: {e}")
                 continue
@@ -136,13 +144,13 @@ def generate_promptset(dataset_goal, dataset_type):
     return promptset
 
 def get_seed_data(search_metadata):
+    print(search_metadata)
     texts = []
     offset = random.randint(100, 1000)
     length = 100
-    headers = {"Authorization": f"Bearer {api_keys['HF_API_KEY']}"}
+    headers = {"Authorization": f"Bearer {config_values['HF_API_KEY']}"}
     if isinstance(search_metadata, list):
         search_metadata = search_metadata[0]
-    print(search_metadata)
     dataset_types = {
         'web_data': f"https://datasets-server.huggingface.co/search?dataset=Salesforce%2Ffineweb_deduplicated&config=default&split=train&query={requests.utils.quote(search_metadata['search_term'])}&offset={offset}&length={length}",
         'educational_web_data' : f"https://datasets-server.huggingface.co/rows?dataset=HuggingFaceFW%2Ffineweb-edu&config=default&split=train&query={requests.utils.quote(search_metadata['search_term'])}&offset={offset}&length={length}",
@@ -158,13 +166,13 @@ def get_seed_data(search_metadata):
     response.raise_for_status()
     for data in response.json()['rows']:
         texts.append(data['row']['text'])
-    embeddings = model.encode(texts)
+    embeddings = embedding_model.encode(texts)
     embeddings_f32 = np.array(embeddings).astype('float32')
     dimension = embeddings_f32.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings_f32)
     query = search_metadata['search_term']
-    query_embedding = model.encode([query])
+    query_embedding = embedding_model.encode([query])
     query_embedding_f32 = query_embedding.astype('float32')
     k = 1
     _, indices = index.search(query_embedding_f32, k)
@@ -179,12 +187,11 @@ def generate_chat_response(chat_history):
         }
     ]
     message_list += chat_history
-    completion = client.chat.completions.create(
+    completion = chat_client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=message_list,
         temperature=0.5,
         max_tokens=4000,
-        top_p=1,
         stream=False,
         response_format={"type": "json_object"},
         stop=None,
@@ -194,8 +201,9 @@ def generate_chat_response(chat_history):
     if 'chat_status' in response_content and response_content['chat_status'] == "finished":
         dataset_type = response_content['dataset_type']
         dataset_goal = response_content['master_prompt']
+        selected_model = response_content['selected_model']
         
-        thread = threading.Thread(target=generate_data, args=(dataset_type, dataset_goal))
+        thread = threading.Thread(target=create_model, args=(dataset_type, dataset_goal))
         thread.start()
         
         return "The model creation has started and is running in the background. You will be notified once it's complete."
@@ -208,125 +216,171 @@ def validate_dataset(dataset):
 
 def generate_data(dataset_type_val, dataset_goal):
     print("Generating promptset...")
-    final_promptset = generate_promptset(
-        dataset_goal=dataset_goal,
-        dataset_type=dataset_type_val
-    )
+    final_promptset = None
+    while final_promptset == None:
+        final_promptset = generate_promptset(
+            dataset_goal=dataset_goal,
+            dataset_type=dataset_type_val
+        )
     print(f"Generated {len(final_promptset)} prompts.")
     
-    # Save the generated promptset to a file
-    dataset_path = f"{Path.cwd()}/generated_datasets/prompts.json"
-    try:
-        with open(dataset_path, 'w') as f:
-            json.dump(final_promptset, f, indent=4, ensure_ascii=False)
-        print("Promptset generation completed.")
-    except Exception as e:
-        print(f"Error saving promptset: {e}")
-        return None
+    if dataset_type_val == "text_only":
+        search_metadata = generate_prompts(
+            dataset_goal=dataset_goal,
+            seed_data_val="",
+            dataset_type_val=dataset_type_val,
+            should_search_val="true"
+        )
+        seed_data = None
+        while seed_data == None:
+            seed_data = get_seed_data(search_metadata)
+        seed_data_str = ""
+        for sample_num, data in enumerate(seed_data):
+            seed_data_str += f"The following is the {sample_num}th sample from the seed dataset:\n\n{data}\n\n"
 
-    # Prepare system prompt for data generation
-    search_metadata = generate_prompts(
-        dataset_goal=dataset_goal,
-        seed_data_val="",
-        dataset_type_val=dataset_type_val,
-        should_search_val="true"
-    )
-    seed_data = get_seed_data(search_metadata)
-    seed_data_str = ""
-    for sample_num, data in enumerate(seed_data):
-        seed_data_str += f"The following is the {sample_num}th sample from the seed dataset:\n\n{data}\n\n"
+        final_datagen_system_prompt = datagen_system_prompt.format(
+            dataset_goal=dataset_goal,
+            dataset_type=dataset_type_val,
+            seed_data=seed_data_str
+        )
 
-    final_datagen_system_prompt = datagen_system_prompt.format(
-        dataset_goal=dataset_goal,
-        correction_status="false",
-        dataset_type=dataset_type_val,
-        seed_data=seed_data_str
-    )
-
-    # Endpoint and headers for API requests
-    endpoint = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_keys['GROQ_API_KEY']}"
-    }
-
-    final_dataset = {}
-    print("\nGenerating dataset with responses...")
-
-    # Process prompts in batches of 10
-    prompt_batches = [list(final_promptset.items())[i:i + 50] for i in range(0, len(final_promptset), 30)]
-    for batch_num, batch in enumerate(prompt_batches):
-        print(f"Processing batch {batch_num + 1} of {len(prompt_batches)}")
-        
-        # Create a batch request
-        batch_messages = [
-            {
-                "role": "system",
-                "content": final_datagen_system_prompt
-            },
-            {
-                "role": "user",
-                "content": "\n".join([prompt_content for _, prompt_content in batch])
-            }
-        ]
-        instance = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": batch_messages,
-            "temperature": 0.5,
-            "max_tokens": 32000,
-            "stream": False,
-            "stop": None
+        # Endpoint and headers for API requests
+        endpoint = f"{api_url}/v1/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config_values['AI_API_KEY']}"
         }
 
-        # Use make_sequential_request for retries
-        try:
-            response = make_sequential_request(endpoint, headers, instance, retry_count=5)
-            if not isinstance(response, dict) or 'choices' not in response:
-                print(f"Invalid response format for batch {batch_num + 1}")
+        final_dataset = {}
+        print("\nGenerating dataset with responses...")
+
+        # Process prompts in batches of 10
+        # [list(final_promptset.items())[i:i + 100] for i in range(0, len(final_promptset), 100)]
+        #prompt_batches = [list(final_promptset.items())[i:i + 100] for i in range(0, len(final_promptset), 100)]
+        for prompt_num, prompt in final_promptset.items():
+            print(f"Processing prompt no : {prompt_num}")
+            
+            # Create a batch request
+            # "content": "\n".join([prompt_content for _, prompt_content in batch])
+            batch_messages = [
+                {
+                    "role": "system",
+                    "content": final_datagen_system_prompt
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            instance = {
+                "model": "llama-3.3-70b",
+                "messages": batch_messages,
+    
+                "max_tokens": 8192,
+                "stream": False,
+
+            }
+
+            # Use make_sequential_request for retries
+            try:
+                response = make_sequential_request(endpoint, headers, instance, retry_count=8)
+                if not isinstance(response, dict) or 'choices' not in response:
+                    print(f"Invalid response format for prompt {prompt_num}")
+                    continue
+
+                content = response['choices'][0]['message']['content']
+                final_response = json_repair.loads(content)
+
+                # Handle different response formats
+                if isinstance(final_response, list):
+                    for item in final_response:
+                        if isinstance(item, dict):
+                            final_dataset.update(item)
+                elif isinstance(final_response, dict):
+                    final_dataset.update(final_response)
+
+            except Exception as e:
+                print(f"Error processing prompt no {prompt}: {e}")
                 continue
 
-            content = response['choices'][0]['message']['content']
-            final_response = json_repair.loads(content)
+            time.sleep(3)  # Add a small delay between batches
 
-            # Handle different response formats
-            if isinstance(final_response, list):
-                for item in final_response:
-                    if isinstance(item, dict):
-                        final_dataset.update(item)
-            elif isinstance(final_response, dict):
-                final_dataset.update(final_response)
+        print("Dataset generation completed.")
 
+        # Validate dataset before saving
+        if not validate_dataset(final_dataset):
+            print("Warning: Dataset contains invalid entries")
+
+        # Create unique filename
+        os.makedirs(f"{Path.cwd()}/generated_datasets", exist_ok=True)
+        unique_id = uuid.uuid4().hex[:8]
+        dataset_path = f"{Path.cwd()}/generated_datasets/dataset_{unique_id}.json"
+
+        try:
+            with open(dataset_path, 'w') as f:
+                json.dump(final_dataset, f, indent=4, ensure_ascii=False)
+            print(f"Dataset successfully written to {dataset_path}")
         except Exception as e:
-            print(f"Error processing batch {batch_num + 1}: {e}")
-            continue
+            print(f"Error writing to file: {e}")
+            return None
 
-        time.sleep(10)  # Add a small delay between batches
+        return [dataset_path,seed_data_str]
 
-    print("Dataset generation completed.")
+def create_model(dataset_type,dataset_goal,selected_model):
+    dataset_path = generate_data(dataset_type,dataset_goal)
+  #  finetuned_model_path = finetune_model(selected_model,dataset_path[0],dataset_type)
+   # return finetuned_model_path
 
-    # Validate dataset before saving
-    if not validate_dataset(final_dataset):
-        print("Warning: Dataset contains invalid entries")
+def qa_check(dataset_type,dataset_goal,dataset,seed_data):
+    with open(dataset,'r') as dataset_file:
+        current_dataset = json_repair.loads(dataset_file.read())
+    similarity_threshold = 0.95
+    endpoint = f"{api_url}/v1/chat/completions"
+    headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {config_values['AI_API_KEY']}"
+        }
+    final_rewritegen_system_prompt = rewritegen_system_prompt.format(
+            seed_data=seed_data,
+            dataset_goal = dataset_goal,
+            dataset_type=dataset_type
+        )
+    instance = {
+            "model": "llama-3.3-70b",
+            "messages": [
+                {"role": "system", "content": final_rewritegen_system_prompt},
+                {"role": "user", "content": dataset_goal}
+            ],
 
-    # Create unique filename
-    os.makedirs(f"{Path.cwd()}/generated_datasets", exist_ok=True)
-    unique_id = uuid.uuid4().hex[:8]
-    dataset_path = f"{Path.cwd()}/generated_datasets/dataset_{unique_id}.json"
-
-    try:
+            "stream": False,
+            "max_tokens": 8192
+        }
+    if dataset_type == "text_only":
+        metric = BERTScore(model_name_or_path="sentence-transformers/all-MiniLM-L6-v2")
+        for prompt, response in current_dataset.items():
+            current_similarity_score = metric([str(response)], [str(prompt)])['f1'].item()
+            current_prompt = prompt
+            current_response = response
+            while current_similarity_score <= similarity_threshold:
+                rewrite_input = f""""
+                                prompt : {current_prompt},
+                                response" : {current_response},
+                                similarity_score : {current_similarity_score}
+                                """
+                instance["messages"][0]["content"] = rewrite_input
+                response = make_sequential_request(endpoint, headers, instance)
+                rewritten_response = json_repair.loads(response['choices'][0]['message']['content'])
+                print(rewritten_response)
+                print(f"the type of returned rewritten response : {type(rewritten_response)}")
+                current_similarity_score =  metric([rewritten_response['improved_response']], [rewritten_response['prompt']])['f1'].item()
+                current_response = rewritten_response['improved_response']
+                current_prompt = rewritten_response['prompt']   
+            current_dataset[current_prompt] = current_response
+        os.remove(dataset)
+        unique_id = uuid.uuid4().hex[:8]
+        dataset_path = f"{Path.cwd()}/generated_datasets/dataset_{unique_id}.json"
         with open(dataset_path, 'w') as f:
-            json.dump(final_dataset, f, indent=4, ensure_ascii=False)
-        print(f"Dataset successfully written to {dataset_path}")
-    except Exception as e:
-        print(f"Error writing to file: {e}")
-        return None
-
-    return dataset_path
-
-def create_directory(uuid_name):
-    os.makedirs(uuid_name, exist_ok=True)
-    return uuid_name
-
-def save_as_json(data, directory, filename):
-    with open(os.path.join(directory, f"{filename}.json"), 'w') as f:
-        json.dump(data, f, indent=4)
+                json.dump(current_dataset, f, indent=4, ensure_ascii=False)
+        return dataset_path
+    else:
+        pass
