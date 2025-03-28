@@ -17,3 +17,5 @@ llama.cpp/
 _unsloth_sentencepiece_temp/
 outputs/
 model/
+unsloth_compiled_cache/
+test3.py

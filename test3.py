@@ -4,6 +4,6 @@ accuracy_1 = evaluate_model("/teamspace/studios/this_studio/dataset_gen/finetune
 
 print(f"accuracy of the finetuned model is:{accuracy_1}")
 
-accuracy_2 = evaluate_model("/teamspace/studios/this_studio/qwen2.5-3b","/teamspace/studios/this_studio/dataset_gen/generated_datasets/ac80fff99668/test.json") 
+#accuracy_2 = evaluate_model("/teamspace/studios/this_studio/qwen2.5-3b","/teamspace/studios/this_studio/dataset_gen/generated_datasets/ac80fff99668/test.json") 
 
-print(f"accuracy of the unquantized model is:{accuracy_2}")
+#print(f"accuracy of the unquantized model is:{accuracy_2}")
