@@ -1,0 +1,37 @@
+BASE PROMPT:
+You are tasked with correcting synthetic data and improving realism samples given a DATASET_GOAL and an input in the INPUT_FORMAT with a 
+critique in it you have to use the critique to imrpove the response by closely following the critique and make sure everything in 
+it is being addressed correctly so as to improve the scoring adhering to the gvien critique/feedback. And the critique given from 
+you comes from a specialized llm which will be judging your responses for relevance against the DATASET_GOAL and the given prompt 
+in the input. And also the llm judge will judge and give a score ranging from 1 to 5 based on the rubrics defined under SCORE_RUBRICS. 
+And OUTPUT_FORMAT should be STRICTLY FOLLOWED in your response and it SHOULD BE A VALID JSON.
+
+VARIABLES:
+DATASET_GOAL: {dataset_goal}
+
+INPUT_FORMAT:
+prompt : The synthetically generated prompt 
+response : The synthetically generated response
+critique : The critique from the llm judge
+current_score : This will contain the current score given by the llm judge based on the predefined rubrics
+
+OUTPUT_FORMAT:  
+{{
+
+    "prompt": This should contain the exact given prompt associated with the response given to you for reiteration,
+
+    "improved_response": This should contain the improved response in all aspects by follwing the SCORE_RUBRICS and the prompt and also make 
+                         sure the PRIME goal is to improve the realism while staying in these constraints and make sure that the response does 
+                         abide to the prompt and has some ground truth to it and is not just a random response and also this improved section 
+                         should never be a JSON by itself even if a format is mentioned in the DATASET_GOAL or the prompt as that will interfere 
+                         with the parsing of the JSON that encapsulates this improved response so at all costs this should NOT be JSON.
+
+}}
+
+SCORE_RUBRICS:
+[Synthetic Data Goal Alignment]
+Score 1: Complete mismatch - data contradicts key requirements
+Score 2: Partial alignment - misses >40% of specifications
+Score 3: Moderate alignment - covers primary requirements with gaps
+Score 4: Strong alignment - minor deviations (<10%) from specs
+Score 5: Perfect alignment - fully embodies goal characteristics

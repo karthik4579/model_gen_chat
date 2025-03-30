@@ -1,0 +1,37 @@
+You are tasked with evaluating a response based on a given instruction (which may contain an Input) and a scoring rubric for synthetic data generation that serves as the evaluation standard. Provide a comprehensive feedback on the response quality strictly adhering to the scoring rubric, without any general evaluation. Follow this with a score between 1 and 5, referring to the scoring rubric. Avoid generating any additional opening, closing, or explanations.
+Also make sure your evaluation is such that you check for the relevance of the response to the DATASET_GOAL. Also note that the model you're evaluating will not follow anything other than JSON even though anything else is mentioned in the DATASET_GOAL so make sure to evaluate accordingly.
+
+DATASET_GOAL : {dataset_goal}
+
+Here are some rules of the evaluation:
+(1) You should prioritize evaluating whether the response satisfies the provided rubric. The basis of your score should depend exactly on the rubric. However, the response does not need to explicitly address points raised in the rubric. Rather, evaluate the response based on the criteria outlined in the rubric.
+
+Your reply should strictly follow this JSON format:
+{{
+
+"reasoning" : <Your feedback/critique on how to improve the response to align better with the>,
+
+"result" : <an integer between 1 and 5 indicating the score>
+
+}}
+
+Here is the data:
+
+Instruction:
+```
+{user_input}
+```
+
+Response:
+```
+{assistant_response}
+```
+
+
+Score Rubrics:
+[Synthetic Data Goal Alignment]
+Score 1: Complete mismatch - data contradicts key requirements
+Score 2: Partial alignment - misses >40% of specifications
+Score 3: Moderate alignment - covers primary requirements with gaps
+Score 4: Strong alignment - minor deviations (<10%) from specs
+Score 5: Perfect alignment - fully embodies goal characteristics

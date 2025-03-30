@@ -21,7 +21,6 @@ and CONDITION_2.
 SYSTEM_VARIABLES:
 DATASET_TYPE : {dataset_type}
 DATASET_GOAL: {dataset_goal}
-
 SEED_DATA: {seed_data}
 
 BASE_RESPONSE_FORMAT:
@@ -34,8 +33,10 @@ the value to the key of the prompt DO NOT put the key in there and the value has
 response to that prompt. Below there is  the format in which the input will be given which is defined 
 under INPUT_FORMAT and the format you have to respond to which is defined under OUTPUT_FORMAT. Also 
 remember you habe to strictly follow the OUTPUT_FORMAT and the response HAS TO BE in the format defined
-under OUTPUT_FORMAT DO NOT deviate from it. Also be as descriptive and diverse as possible in your responses 
-given text or the image modality consider this as PRIORITY.
+under OUTPUT_FORMAT DO NOT deviate from it. Also be as descriptive clear and diverse as possible in your responses 
+given text or the image modality consider this as PRIORITY. Also AVOID unnecesary starting and ending closure 
+statements in your responses such as 'here is what you asked for ....' and 'for Further detailed specifications 
+and comparisons let me know ....' etc.
 
 INPUT_FORMAT:
 some given prompt 1
@@ -43,11 +44,16 @@ some given prompt 2
 ...
 some given prompt 100
 
-OUTPUT_FORMAT:
+OUTPUT_FORMAT:  
+here make sure sequences like "Prompt 4: Post-operative Recovery ..." in the key of the your response are not generated as they are not vaild and not useful.
 {{
-    "the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2" etc. in the given input json : "your generated response to the prompt"
+    the actual prompt from the given json input i.e the value to a key like "prompt_1","prompt_2" etc. in the given input json : "your generated response to the prompt in markdown (here DO NOT generate any kind of JSON within a response even IF asked, this BREAKS the system if some kind of json is found in your response basically never generate JSON here even if the prompt says so and do avoid to do at all times.)"
 }}
 
+OUTPUT_EXAMPLE:
+{{
+"Detail the sensor parameters, failure signatures, and edge processing requirements for an industrial HVAC predictive maintenance system using vibration and thermal data.": "The system uses triaxial MEMS accelerometers (e.g., Analog Devices ADXL series, TDK InvenSense ICM-20948) with 1 kHz to 5 kHz adjustable sampling, covering a frequency range of 10 Hz - 4000 Hz, and a selectable measurement range of ±2g to ±16g with at least 12-bit resolution, providing raw time-domain acceleration data. Thermal data is acquired using sensors like the FLIR Lepton 3.5 (160x120 pixels) or Seek Thermal Compact Pro (320x240 pixels), covering a temperature range of -40°C to +150°C, with thermal sensitivity (NETD) <50 mK, accuracy of ±1°C or ±1%, and frame rates of 8.7 Hz (FLIR) or >9 Hz (Seek), providing raw thermal image data. Failure signatures are detected by correlating vibration and thermal data: Bearing faults (increased energy in specific frequency bands related to bearing geometry and speed, increased RMS, elevated kurtosis, impacting events, and localized temperature increase); Motor imbalance (dominant 1xRPM peak and harmonics in vibration, uneven temperature distribution thermally); Belt wear/misalignment (vibration at belt's frequency and harmonics, sidebands around motor's frequency, increased vibration amplitude, and increased temperature at belt/pulleys); Refrigerant issues (undercharge: lower temperature difference across evaporator, lower suction line temperature; overcharge" : "higher temperature difference, higher discharge line temperature; leak: localized temperature drop); Compressor faults (slugging: high-amplitude, low-frequency vibrations and fluctuating temperatures; valve issues: changes in high-frequency vibration and abnormal temperature differences); Blower motor/fan blade issues (similar to motor imbalance, with additional frequencies related to fan blades, and increased temperature); Electrical faults (potential increase in 120 Hz or 100 Hz vibration due to electrical hum, and hotspots in electrical components). Edge processing utilizes hardware such as ARM Cortex-M4/M7/A-series, ESP32, or similar, with at least 512KB RAM, 4MB flash, low-power design, and wireless communication. Software includes an RTOS (e.g., FreeRTOS), data acquisition drivers, feature extraction (vibration: time-domain - RMS, peak, crest factor, kurtosis, skewness; frequency-domain - FFT, PSD, spectral centroid, entropy, band energy; thermal: ROI processing - mean, max, min, standard deviation, ΔT, gradients, and potentially image processing), data quantization/compression, anomaly detection/fault classification (rule-based thresholds and/or machine learning models like decision trees, SVMs, k-NN, Naive Bayes, or small CNNs/RNNs), alerting, and data logging. The input tensor shape is configurable (e.g., 30s window, 1kHz sampling, RMS, kurtosis, 5 frequency bands from vibration, mean/max temps from 4 ROIs in thermal data results in a (1, 29) tensor). Failure labels include at least seven distinct classes (bearing faults, motor imbalance, belt wear/misalignment, refrigerant issues, compressor faults, blower motor/fan blade issues, electrical faults), with potential subclasses for severity. Validation involves cross-validation with ASHRAE standards and maintenance logs, field testing, and comparison with traditional vibration analysis techniques."
+}}
 
 CONDITIONS:
 CONDITION_1 = The dataset type is text_only.
@@ -57,4 +63,6 @@ IF $CONDITION_1:
     Then you need to generate a well response and long enough response to closely mimic the kind of data
     given in the samples under the SEED_DATA depending upon the given goal of the user and the type of the 
     dataset and make sure that the response is unique and is not too similar to the seed data response. Als 
-    there shpould be NO figures or any kind of tables included in the response it should be just be in plain text.
+    there should be NO figures or any kind of tables included in the response it should be just be in plain text.
+    And aim for atleast overall SIMILARITY_SCORE_TARGET ATLEAST with the given prompt consider THIS as the criteria 
+    with the HIGHEST PRIORITY check the OUTPUT_EXAMPLE for a clarity on what is expected as output.
